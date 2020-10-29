@@ -10,7 +10,7 @@ void main() {
   vCoordinates = aCoordinates.xy;
   vec3 pos = position;
 
-  pos.z = pos.z + (sin(pos.x + (time / 1000.0)) * uProgress) + (sin(pos.y + (time / 1000.0)) * uProgress) ;
+  pos.z = pos.z + ((sin(pos.x + (time / 1000.0)) + 1.0) * uProgress) + ((sin(pos.y + (time / 1000.0)) + 1.0) * uProgress) ;
 
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 

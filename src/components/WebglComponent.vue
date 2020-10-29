@@ -3,9 +3,10 @@
 </template>
 
 <script lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import * as THREE from 'three'
-import t1 from './picture.jpg'
+import t1 from './textures/t1.jpg'
+import t2 from './textures/t2.jpg'
 import dat from 'dat.gui'
 
 // eslint-disable-next-line
@@ -20,6 +21,7 @@ export default {
     let positions, coordinates
     let textures
     let gui, settings
+    let raf
 
     const setSize = () => {
       const { width, height } = container.value.getBoundingClientRect()
@@ -36,10 +38,12 @@ export default {
 
     const init = () => {
       settings = {
-        progress: 0,
+        uProgress: 0,
+        uMix: 0,
       }
       gui = new dat.GUI({ name: 'My GUI' })
-      gui.add(settings, 'progress', 0, 300, 0.1).setValue(300)
+      gui.add(settings, 'uProgress', 0, 300, 0.1).setValue(85)
+      gui.add(settings, 'uMix', 0, 1, 0.01).setValue(0)
 
       const { width, height } = container.value.getBoundingClientRect()
 
@@ -48,7 +52,10 @@ export default {
 
       scene = new THREE.Scene()
 
-      textures = [new THREE.TextureLoader().load(t1)]
+      textures = [
+        new THREE.TextureLoader().load(t1),
+        new THREE.TextureLoader().load(t2),
+      ]
 
       // geometry = new THREE.PlaneBufferGeometry(1.0, 1.0, 10.0, 10.0)
       geometry = new THREE.BufferGeometry()
@@ -76,14 +83,17 @@ export default {
 
       // material = new THREE.MeshNormalMaterial()
       material = new THREE.ShaderMaterial({
-        fragmentShader: require('./fragment.glsl').default,
-        vertexShader: require('./vertex.glsl').default,
+        fragmentShader: require('./glsl/fragment.glsl').default,
+        vertexShader: require('./glsl/vertex.glsl').default,
         uniforms: {
           time: { value: 1.0 },
           t1: { value: textures[0] },
-          progress: { value: null },
+          t2: { value: textures[1] },
+          uMix: { value: 0.0 },
+          uProgress: { value: null },
         },
         side: THREE.DoubleSide,
+        transparent: true,
       })
       mesh = new THREE.Points(geometry, material)
       scene.add(mesh)
@@ -101,11 +111,12 @@ export default {
 
       renderer.render(scene, camera)
 
-      window.requestAnimationFrame(update)
+      raf = window.requestAnimationFrame(update)
 
-      time += 1
+      time += 1.0
       material.uniforms.time.value = time
-      material.uniforms.progress.value = settings.progress
+      material.uniforms.uProgress.value = settings.uProgress
+      material.uniforms.uMix.value = settings.uMix
     }
 
     const viewportHandler = () => {
@@ -118,6 +129,12 @@ export default {
       update()
 
       window.addEventListener('resize', viewportHandler)
+    })
+
+    onUnmounted(() => {
+      gui.destroy()
+      window.cancelAnimationFrame(raf)
+      window.removeEventListener('resize', viewportHandler)
     })
 
     return {

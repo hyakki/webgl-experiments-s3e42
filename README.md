@@ -1,24 +1,9 @@
-# webgl-experiments-boilerplate
+# webgl-experiments-s3e42
 
-## Project setup
-```
-yarn install
-```
+## Demo
+https://hyakki.github.io/webgl-experiments-s3e42/
 
-### Compiles and hot-reloads for development
-```
-yarn serve
-```
-
-### Compiles and minifies for production
-```
-yarn build
-```
-
-### Lints and fixes files
-```
-yarn lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+## Credits
+Original website: http://mathis-biabiany.fr/
+Developer: https://twitter.com/MathisBiabiany
+Yuri Artyukh - [#s3e42 ALL YOUR HTML, Particles from Mathis Biabiany website](https://youtu.be/8K5wJeVgjrM)

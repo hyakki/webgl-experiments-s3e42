@@ -22,7 +22,9 @@ body {
 }
 
 .app {
-  color: $c-black;
+  @include get-all-space;
+
+  background-color: #1e1832;
 }
 
 .app__webgl {

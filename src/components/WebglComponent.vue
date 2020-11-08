@@ -11,6 +11,12 @@ import t2 from './textures/t2.jpg'
 import t3 from './textures/t3.jpg'
 import dat from 'dat.gui'
 
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+
+import glsl from 'glslify'
+
 // eslint-disable-next-line
 let OrbitControls = require('three-orbit-controls')(THREE)
 
@@ -25,11 +31,16 @@ export default {
     let gui, settings
     let raf
     let mesh2
+    let currentIndex, nextIndex
+    let composer, renderPass, bloomPass
 
     const setSize = () => {
       const { width, height } = container.value.getBoundingClientRect()
 
+      renderer.setPixelRatio(window.devicePixelRatio)
+
       renderer.setSize(width, height)
+      composer.setSize(width, height)
     }
 
     const setCameraAspect = () => {
@@ -37,6 +48,11 @@ export default {
 
       camera.aspect = width / height
       camera.updateProjectionMatrix()
+    }
+
+    const swapTexture = (currentIndex, nextIndex) => {
+      material.uniforms.currentTexture.value = textures[currentIndex]
+      material.uniforms.nextTexture.value = textures[nextIndex]
     }
 
     const init = () => {
@@ -48,7 +64,7 @@ export default {
       }
       gui = new dat.GUI({ name: 'My GUI' })
       gui.add(settings, 'uProgress', 0, 128, 0.1)
-      gui.add(settings, 'uMix', 0, 3, 0.1)
+      gui.add(settings, 'uMix', 0, 1, 0.01)
       gui.add(settings, 'wireframe').onChange(() => {
         mesh2.material.wireframe = settings.wireframe
         mesh2.material.opacity = settings.wireframe ? 1.0 : 0.0
@@ -96,16 +112,20 @@ export default {
       geometry.setAttribute('position', positions)
       geometry.setAttribute('aCoordinates', coordinates)
 
+      currentIndex = 0
+      nextIndex = 1
+
       // material = new THREE.MeshNormalMaterial()
       material = new THREE.ShaderMaterial({
-        fragmentShader: require('./glsl/fragment.glsl').default,
-        vertexShader: require('./glsl/vertex.glsl').default,
+        fragmentShader: glsl(require('./glsl/fragment.glsl').default),
+        vertexShader: glsl(require('./glsl/vertex.glsl').default),
         uniforms: {
           time: { value: 1.0 },
-          currentTexture: { value: textures[0] },
-          nextTexture: { value: textures[1] },
+          currentTexture: { value: textures[currentIndex] },
+          nextTexture: { value: textures[nextIndex] },
           uMix: { value: 0.0 },
           uProgress: { value: null },
+          uBloom: { value: 0 },
         },
         side: THREE.DoubleSide,
         transparent: true,
@@ -122,9 +142,24 @@ export default {
         })
       )
 
-      scene.add(mesh2)
+      // scene.add(mesh2)
 
-      renderer = new THREE.WebGLRenderer({ antialias: true })
+      renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true })
+      composer = new EffectComposer(renderer)
+
+      renderPass = new RenderPass(scene, camera)
+
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(width, height),
+        0.0,
+        0.5,
+        0.0
+      )
+
+      composer.addPass(renderPass)
+      composer.addPass(bloomPass)
+
+      bloomPass.renderToScreen = true
 
       // OrbitControls
       new OrbitControls(camera, renderer.domElement)
@@ -132,34 +167,94 @@ export default {
       setSize()
       container.value.appendChild(renderer.domElement)
 
-      const o = { v: 0 }
+      const o = {
+        mix: 0,
+        progress: 0,
+      }
 
-      gsap.to(o, {
-        duration: 3 * 2,
-        v: 3,
-        repeat: -1,
-        ease: 'linear',
+      const duration = 1.4
+
+      const tl = gsap.timeline({
+        delay: 2,
+        paused: true,
         onUpdate: () => {
-          settings.uMix = o.v
+          settings.uMix = o.mix
+          settings.uProgress = o.progress
           gui.updateDisplay()
         },
       })
-    }
 
-    const isBetween = (v, min, max) => {
-      return v >= min && v < max
-    }
+      tl.to(
+        o,
+        {
+          duration: duration / 2,
+          progress: 100,
+          ease: 'power4.easeIn',
+        },
+        '#start'
+      )
 
-    const swapTexture = (currentIndex, nextIndex) => {
-      material.uniforms.currentTexture.value = textures[currentIndex]
-      material.uniforms.nextTexture.value = textures[nextIndex]
+      tl.to(
+        bloomPass,
+        {
+          duration: duration / 2,
+          strength: 0.5,
+          ease: 'power4.easeIn',
+        },
+        '#start'
+      )
+
+      tl.to(
+        o,
+        {
+          duration: duration * 1.5,
+          mix: 1,
+          ease: 'power4.easeOut',
+        },
+        `#start+=${duration * 0.2}`
+      )
+
+      tl.to(
+        o,
+        {
+          duration: duration / 2,
+          progress: 0,
+          ease: 'power4.easeOut',
+        },
+        `#start+=${1.5 + duration * 0.75}`
+      )
+
+      tl.to(
+        bloomPass,
+        {
+          duration: duration / 2,
+          strength: 0,
+          ease: 'power4.easeOut',
+        },
+        `#start+=${1.5 + duration * 0.75}`
+      )
+
+      tl.play()
+
+      tl.eventCallback('onComplete', () => {
+        currentIndex = nextIndex
+        nextIndex = currentIndex > textures.length - 2 ? 0 : currentIndex + 1
+
+        setTimeout(() => {
+          settings.uMix = 0
+          material.uniforms.uMix.value = 0
+          swapTexture(currentIndex, nextIndex)
+
+          tl.play(0)
+        }, 3000)
+      })
     }
 
     const update = () => {
       // mesh.rotation.x += 0.005
       // mesh.rotation.y += 0.01
 
-      renderer.render(scene, camera)
+      composer.render(scene, camera)
 
       raf = window.requestAnimationFrame(update)
 
@@ -167,14 +262,6 @@ export default {
       material.uniforms.time.value = time
       material.uniforms.uProgress.value = settings.uProgress
       material.uniforms.uMix.value = settings.uMix
-
-      if (isBetween(settings.uMix, 1.0, 2.0)) {
-        swapTexture(1, 2)
-      } else if (isBetween(settings.uMix, 2.0, 3.0)) {
-        swapTexture(2, 0)
-      } else {
-        swapTexture(0, 1)
-      }
     }
 
     const viewportHandler = () => {

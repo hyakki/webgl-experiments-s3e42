@@ -11,7 +11,7 @@ void main() {
   vec4 next = texture2D(nextTexture, myUV);
   // gl_FragColor = vec4(vUv.x, vUv.y, 0.0, 1.0);
   // gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-  vec4 color = mix(current, next, smoothstep(0.0, 1.0, mod(uMix, 1.0)));
+  vec4 color = mix(current, next, smoothstep(0.0, 1.0, uMix));
 
   float d = distance(vec3(vPos.x, vPos.y, 0.0), vec3(vPos));
 
